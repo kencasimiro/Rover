@@ -1,0 +1,102 @@
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+    <script src="static/jquery.min.js"></script>
+    <script type="text/javascript" src="static/socket.io.min.js"></script>
+    <script src="static/virtualjoystick.js"></script>
+    <script type="text/javascript">
+    $(document).ready(function(){
+        console.log("touchscreen is", VirtualJoystick.touchScreenAvailable() ? "available" : "not available");
+
+	var socket = io.connect('//' + document.domain + ':' + location.port + '{{socketio_namespace}}');
+        var joystick	= new VirtualJoystick({
+            container	: document.getElementById('container'),
+            mouseSupport	: true,
+        });
+        joystick.addEventListener('touchStart', function(){
+            console.log('down');
+        })
+        joystick.addEventListener('touchEnd', function(){
+            console.log('up');
+        })
+
+        setInterval(function(){
+            var dx = joystick.deltaX();
+            var dy = joystick.deltaY();
+
+            dx = -dx; // somehow the steering is backwards
+            dx *= {{throttle_scale}};
+            dx += {{neu_steering}};
+
+            dy = -dy; // damn upside-down computer screens
+            dy *= {{steering_scale}};
+            dy += {{neu_throttle}};
+
+            socket.emit(
+		    '{{value_changed}}',
+                    {
+                        steering: dx,
+                        throttle: dy
+                    });
+        }, 1/{{framerate}} * 1000);
+
+	socket.on('{{rover_connected}}', function() {
+	    //TODO get this to work even if the rover connects before the browser
+            socket.emit('connected', {data: 'I\'m connected!'});
+	    $('#status').text('rover connected');
+        });
+
+	socket.on('{{rover_image}}', function(b64) {
+	    $('#stream').attr("src", "data:image/jpeg;base64," + b64);
+        });
+
+        socket.on('connect', function() {
+            socket.emit('connected', {data: 'I\'m connected!'});
+        });
+
+    });
+    </script>
+
+    <style>
+    body {
+        overflow	: hidden;
+        padding		: 0;
+        margin		: 0;
+       /* background-color: #BBB;*/
+        background-color:rgba(0,0,0,0.0);
+    }
+    #container {
+        width		: 100%;
+        height		: 100%;
+        overflow	: hidden;
+        padding		: 0;
+        margin		: 0;
+        -webkit-user-select	: none;
+        -moz-user-select	: none;
+    }
+    #stream {
+       /* display: block;
+        margin: 0 auto;*/
+        width  : 100%;
+        height : auto;
+    }
+    #status {
+	position: absolute;
+	top: 1em;
+	left: 1em;
+	z-index: 100;
+    }
+    </style>
+</head>
+<body>
+    <div id="status">
+	Awaiting connection to rover...
+    </div>
+    <div id="container">
+        <!-- here's the url for the video -->
+        <img id="stream">
+    </div>
+</body>
+</html>
